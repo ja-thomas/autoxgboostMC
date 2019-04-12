@@ -179,10 +179,51 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
     set_parset = function(value) {
       self$parset = assert_class(value, "ParamSet", null.ok = TRUE)
     }
+  ),
+  private = list(
+    make_baselearner = make_baselearner
   )
 )
 
+# # Create the baselearner for a given task and measure
+# make_baselearner = function(task, measure) {
+#   req_prob_measure = sapply(self$measures, function(x) {
+#     any(getMeasureProperties(x) == "req.prob")
+#   })
+#   tt = getTaskType(task)
+#   td = getTaskDesc(task)
+#   has.cat.feats = sum(td$n.feat[c("factors", "ordered")]) > 0
+#   pv = list()
+#   if (!is.null(nthread))
+#     pv$nthread = self$nthread
 
+#   # create base.learner
+#   if (tt == "classif") {
+#     predict.type = ifelse(any(req_prob_measure) | self$tune.threshold, "prob", "response")
+#     if(length(td$class.levels) == 2) {
+#       objective = "binary:logistic"
+#       eval_metric = "error"
+#       par.set = c(par.set, makeParamSet(makeNumericParam("scale_pos_weight", lower = -10, upper = 10, trafo = function(x) 2^x)))
+#     } else {
+#       objective = "multi:softprob"
+#       eval_metric = "merror"
+#     }
+#     base.learner = makeLearner("classif.xgboost.earlystop", id = "classif.xgboost.earlystop", predict.type = predict.type,
+#       eval_metric = eval_metric, objective = objective, early_stopping_rounds = self$early.stopping.rounds, maximize = !measure[[1]]$minimize,
+#       max.nrounds = self$max.nrounds, par.vals = pv)
 
+#   } else if (tt == "regr") {
+#     predict.type = NULL
+#     objective = "reg:linear"
+#     eval_metric = "rmse"
+#     base.learner = makeLearner("regr.xgboost.earlystop", id = "regr.xgboost.earlystop",
+#       eval_metric = eval_metric, objective = objective, early_stopping_rounds = self$early.stopping.rounds, maximize = !measure[[1]]$minimize,
+#       max.nrounds = self$max.nrounds, par.vals = pv)
+
+#   } else {
+#     stop("Task must be regression or classification")
+#   }
+#   return(base.learner)
+# }
 
 

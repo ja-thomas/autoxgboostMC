@@ -43,16 +43,16 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
     props = getMeasureProperties(x)
     any(props == "req.truth") & !any(props == "req.prob")
   })
-  req_prob_measure = sapply(measures, function(x) {
-    any(getMeasureProperties(x) == "req.prob")
-  })
   if (!any(is_thresholded_measure) & tune.threshold) {
     warning("Threshold tuning is active, but no measure for tuning thresholds!
       Skipping threshold tuning!")
     tune.threshold = FALSE
   }
 
-
+  # make_baselearner
+  req_prob_measure = sapply(measures, function(x) {
+    any(getMeasureProperties(x) == "req.prob")
+  })
   tt = getTaskType(task)
   td = getTaskDesc(task)
   has.cat.feats = sum(td$n.feat[c("factors", "ordered")]) > 0
@@ -88,6 +88,7 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
     stop("Task must be regression or classification")
   }
 
+  ## make_pipeline -----
   # Create pipeline
   preproc.pipeline = NULLCPO
 
@@ -109,6 +110,7 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
   task.test %<>>% retrafo(task.train)
   base.learner = setHyperPars(base.learner, early.stopping.data = task.test)
 
+  #-- optimize
   # Optimize
   opt = smoof::makeMultiObjectiveFunction(name = "optimizeWrapperMultiCrit",
     fn = function(x) {
@@ -140,6 +142,7 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
   des = generateDesign(n = design.size, par.set)
   optim.result = mbo(fun = opt, control = control, design = des, learner = mbo.learner)
 
+  #---- finalize
   lrn = buildFinalLearner(optim.result, objective, predict.type, par.set = par.set, preproc.pipeline = preproc.pipeline)
 
   mod = NULL
