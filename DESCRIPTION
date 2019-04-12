@@ -1,7 +1,8 @@
 Package: autoxgboostMC
 Title: Automatic Preprocessing, Fitting and Tuning for xgboost using multiple criteria.
 Version: 0.0.0.9000
-Authors@R: person("Janek", "Thomas", email = "janek.tho@gmail.com", role = c("aut", "cre"))
+Authors@R: c(person("Janek", "Thomas", email = "janek.tho@gmail.com", role = c("aut", "cre")),
+             person("Florian", "Pfisterer", email = "pfistererf@gmail.com", role = c("aut")))
 Description: Automatic tuning and fitting of 'xgboost'. Use early stopping
     to determine the optimal number of iterations and Bayesian optimization (from
     'mlrMBO') for all further parameters. Tunes class weights and thresholds in classification.
@@ -31,4 +32,4 @@ Suggests:
     FeatureHashing,
     anytime,
     lubridate
-RoxygenNote: 6.0.1
+RoxygenNote: 6.1.1
