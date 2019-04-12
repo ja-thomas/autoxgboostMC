@@ -11,12 +11,13 @@ fairf1 = mlr::makeMeasure(id = "fairness.f1", minimize = TRUE, properties = c("c
     (g1f1 - g2f1)^2
   }
 )
-# fairf1 = setMeasurePars(fairf1, extra.args = list(group = getTaskData(pid.task)$age > 30))
+
 
 
 #' Sparsity as percentage of available features
 #' @export
 xgb.sparsity = mlr::makeMeasure(id = "sparse.xgb", minimize = TRUE, properties = c("classif", "response"),
+  extra.args = list(),
   fun = function(task, model, pred, extra.args) {
     if(model$learner$package != "xgboost") stop("Measure sparse.xgb is only available for xgboost models")
     nfeats = setdiff(unique(xgboost::xgb.model.dt.tree(model = model$learner.model)$Feature), "Leaf")

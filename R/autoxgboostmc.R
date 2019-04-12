@@ -123,24 +123,27 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
       if (tune.threshold && getTaskType(task.train) == "classif") {
         tune.res = tuneThreshold(pred = pred, measure = measures[is_thresholded_measure][[1]])
         # FIXME: Does order matter?
-        res = c(performance(pred, measures[is_thresholded_measure], tune.res$perf, model = mod))
+        res = c(performance(pred, measures[!is_thresholded_measure], model = mod, task = task), tune.res$perf)
         attr(res, "extras") = list(nrounds = nrounds, .threshold = tune.res$th)
       } else {
-        res = performance(pred, measures, model = mod)
+        res = performance(pred, measures, model = mod, task = task)
         attr(res, "extras") = list(nrounds = nrounds)
       }
       return(res)
     },
-    par.set = par.set, noisy = TRUE, has.simple.signature = FALSE, minimize = measures[[1]]$minimize)
-
+    par.set = par.set, noisy = FALSE, has.simple.signature = FALSE, minimize =  sapply(measures, function(x) x$minimize),
+    n.objectives = length(measures)
+  )
+  # Multicrit stuff
+  control = setMBOControlMultiObj(control, method = "dib",dib.indicator = "eps")
+  control = setMBOControlInfill(control, crit = makeMBOInfillCritDIB(cb.lambda = 2L))
   des = generateDesign(n = design.size, par.set)
   optim.result = mbo(fun = opt, control = control, design = des, learner = mbo.learner)
 
   lrn = buildFinalLearner(optim.result, objective, predict.type, par.set = par.set, preproc.pipeline = preproc.pipeline)
 
   mod = NULL
-  if(build.final.model)
-    mod = train(lrn, task)
+  if(build.final.model) mod = train(lrn, task)
 
   makeS3Obj("AutoxgbResult",
     optim.result = optim.result,

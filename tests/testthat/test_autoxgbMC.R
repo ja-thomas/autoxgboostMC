@@ -37,9 +37,19 @@ test_that("autoxgboostMC works on different tasks",  {
 })
 
 
+test_that("Multiple measures work",  {
+    fairf1 = setMeasurePars(fairf1, extra.args = list(group = getTaskData(pid.task)$age > 30))
+    axgb = AutoxgboostMC$new(measures = list(acc, timetrain))
+    axgb$fit(pid.task, time.budget = 10L)
+    expect_true(!is.null(axgb$model))
+    p = axgb$predict(pid.task)
+    expect_class(p, "Prediction")
+})
+
 test_that("New measures work",  {
-    axgb = AutoxgboostMC$new(measures = list(acc, timetrain, fairf1, xgb.sparsity))
-    axgb$fit(pid.task, time.budget = 5L)
+    fairf1 = setMeasurePars(fairf1, extra.args = list(group = getTaskData(pid.task)$age > 30))
+    axgb = AutoxgboostMC$new(measures = list(fairf1, xgb.sparsity))
+    axgb$fit(pid.task, time.budget = 10L)
     expect_true(!is.null(axgb$model))
     p = axgb$predict(pid.task)
     expect_class(p, "Prediction")
