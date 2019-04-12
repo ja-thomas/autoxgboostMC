@@ -1,0 +1,34 @@
+Package: autoxgboostMC
+Title: Automatic Preprocessing, Fitting and Tuning for xgboost using multiple criteria.
+Version: 0.0.0.9000
+Authors@R: person("Janek", "Thomas", email = "janek.tho@gmail.com", role = c("aut", "cre"))
+Description: Automatic tuning and fitting of 'xgboost'. Use early stopping
+    to determine the optimal number of iterations and Bayesian optimization (from
+    'mlrMBO') for all further parameters. Tunes class weights and thresholds in classification.
+    Categorical features are handled efficiently either by impact encoding or dummy encoding based on the number of factor levels.
+License: BSD_2_clause + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Depends:
+    R (>= 3.0.2),
+    ParamHelpers (>= 1.10),
+    mlr (>= 2.12),
+    mlrMBO (>= 1.0.0),
+    mlrCPO
+Imports:
+    BBmisc (>= 1.11),
+    checkmate (>= 1.8.2),
+    stringi,
+    DiceKriging,
+    xgboost (>= 0.6.4),
+    smoof,
+    R6
+Suggests:
+    testthat,
+    rpart,
+    cmaes,
+    rgenoud,
+    FeatureHashing,
+    anytime,
+    lubridate
+RoxygenNote: 6.0.1
