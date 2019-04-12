@@ -99,7 +99,7 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
 
     initialize = function(measures = NULL, parset = NULL, nthread = NULL) {
       assert_list(measures, types = "Measure", null.ok = TRUE)
-      assert_class(par.set, "ParamSet", null.ok = TRUE)
+      assert_class(parset, "ParamSet", null.ok = TRUE)
       # Set defaults
       self$measures = coalesce(measures, list(getDefaultMeasure(task)))
       self$parset = coalesce(parset, autoxgboostMC::autoxgbparset)
@@ -119,14 +119,14 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
       self$build.final.model = assert_flag(build.final.model)
       # Set defaults
       if (is.null(control)) {
-        measures_ids = sapply(self$measures, x$id)
+        measures_ids = sapply(self$measures, function(x) x$id)
         ctrl = makeMBOControl(n.objectives = length(measures_ids), y.name = measures_ids)
         self$control = setMBOControlTermination(ctrl, iters = iterations,
           time.budget = time.budget)
       }
       if (length(self$measures) == 1L) {
         # For now we delegate to autoxgboost
-        self$model = autoxgboost(task, measures = self$measures[[1]], control = self$control,
+        self$model = autoxgboost(task, measure = self$measures[[1]], control = self$control,
           iterations = iterations, time.budget = time.budget, par.set = self$parset,
           max.nrounds = self$max.nrounds, early.stopping.rounds = self$early.stopping.rounds,
           early.stopping.fraction = self$early.stopping.fraction,

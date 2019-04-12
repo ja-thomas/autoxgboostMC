@@ -38,9 +38,13 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
   assertFlag(tune.threshold)
 
   # Check whether the measure(s) make sense with thresholding
+
   is_thresholded_measure = sapply(measures, function(x) {
     props = getMeasureProperties(x)
     any(props == "req.truth") & !any(props == "req.prob")
+  })
+  req_prob_measure = sapply(measures, function(x) {
+    any(getMeasureProperties(x) == "req.prob")
   })
   if (!any(is_thresholded_measure) & tune.threshold) {
     warning("Threshold tuning is active, but no measure for tuning thresholds!
@@ -58,7 +62,7 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
 
   # create base.learner
   if (tt == "classif") {
-    predict.type = ifelse("req.prob" %in% measure$properties | tune.threshold, "prob", "response")
+    predict.type = ifelse(any(req_prob_measure) | tune.threshold, "prob", "response")
     if(length(td$class.levels) == 2) {
       objective = "binary:logistic"
       eval_metric = "error"
@@ -69,7 +73,7 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
     }
 
     base.learner = makeLearner("classif.xgboost.earlystop", id = "classif.xgboost.earlystop", predict.type = predict.type,
-      eval_metric = eval_metric, objective = objective, early_stopping_rounds = early.stopping.rounds, maximize = !measure$minimize,
+      eval_metric = eval_metric, objective = objective, early_stopping_rounds = early.stopping.rounds, maximize = !measures[[1]]$minimize,
       max.nrounds = max.nrounds, par.vals = pv)
   } else if (tt == "regr") {
     predict.type = NULL
@@ -77,7 +81,7 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
     eval_metric = "rmse"
 
     base.learner = makeLearner("regr.xgboost.earlystop", id = "regr.xgboost.earlystop",
-      eval_metric = eval_metric, objective = objective, early_stopping_rounds = early.stopping.rounds, maximize = !measure$minimize,
+      eval_metric = eval_metric, objective = objective, early_stopping_rounds = early.stopping.rounds, maximize = !measures[[1]]$minimize,
       max.nrounds = max.nrounds, par.vals = pv)
 
   } else {
@@ -127,7 +131,7 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
       }
       return(res)
     },
-    par.set = par.set, noisy = TRUE, has.simple.signature = FALSE, minimize = measure$minimize)
+    par.set = par.set, noisy = TRUE, has.simple.signature = FALSE, minimize = measures[[1]]$minimize)
 
   des = generateDesign(n = design.size, par.set)
   optim.result = mbo(fun = opt, control = control, design = des, learner = mbo.learner)
@@ -142,7 +146,7 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
     optim.result = optim.result,
     final.learner = lrn,
     final.model = mod,
-    measure = measure,
+    measure = measures,
     preproc.pipeline = preproc.pipeline
   )
 }
