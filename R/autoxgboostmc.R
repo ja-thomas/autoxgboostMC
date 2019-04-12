@@ -119,10 +119,10 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
       if (tune.threshold && getTaskType(task.train) == "classif") {
         tune.res = tuneThreshold(pred = pred, measure = measures[is_thresholded_measure][[1]])
         # FIXME: Does order matter?
-        res = c(performance(pred, measures[is_thresholded_measure], tune.res$perf)
+        res = c(performance(pred, measures[is_thresholded_measure], tune.res$perf, model = mod))
         attr(res, "extras") = list(nrounds = nrounds, .threshold = tune.res$th)
       } else {
-        res = performance(pred, measures)
+        res = performance(pred, measures, model = mod)
         attr(res, "extras") = list(nrounds = nrounds)
       }
       return(res)
