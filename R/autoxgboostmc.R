@@ -1,13 +1,7 @@
 #' @title Fit and optimize a xgboost model for multiple criteria.
 #'
 #' @description
-#' An xgboost model is optimized based on a measure (see [\code{\link[mlr]{Measure}}]).
-#' The bounds of the parameter in which the model is optimized, are defined by \code{\link{autoxgbparset}}.
-#' For the optimization itself bayesian optimization with \pkg{mlrMBO} is used.
-#' Without any specification of the control object, the optimizer runs for for 80 iterations or 1 hour, whatever happens first.
-#' Both the parameter set and the control object can be set by the user.
-#'
-#' For params, see `?autoxgboost`.
+#' For params and a more in-depth description see `?autoxgboost`.
 #'
 #' @param measures [\code{list of \link[mlr]{Measure}}]\cr
 #'   Performance measures. If \code{NULL} \code{\link[mlr]{getDefaultMeasure}} is used.
@@ -19,14 +13,13 @@
 #' iris.task = makeClassifTask(data = iris, target = "Species")
 #' ctrl = makeMBOControl()
 #' ctrl = setMBOControlTermination(ctrl, iters = 1L) #Speed up Tuning by only doing 1 iteration
-#' res = autoxgboost(iris.task, control = ctrl, tune.threshold = FALSE)
+#' res = autoxgboostmc(iris.task, control = ctrl, measures = list(mmce))
 #' res
 #' }
 autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160L, time.budget = 3600L,
   par.set = NULL, max.nrounds = 10^6, early.stopping.rounds = 10L, early.stopping.fraction = 4/5,
   build.final.model = TRUE, design.size = 15L, impact.encoding.boundary = 10L, mbo.learner = NULL,
   nthread = NULL, tune.threshold = TRUE) {
-
 
   # check inputs
   assertClass(task, "SupervisedTask")
@@ -44,6 +37,7 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
   assertIntegerish(nthread, lower = 1, len = 1L, null.ok = TRUE)
   assertFlag(tune.threshold)
 
+  # Check whether the measure(s) make sense with thresholding
   is_thresholded_measure = sapply(measures, function(x) {
     props = getMeasureProperties(x)
     any(props == "req.truth") & !any(props == "req.prob")
@@ -54,14 +48,6 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
     tune.threshold = FALSE
   }
 
-  # set defaults
-  measures = coalesce(measures, list(getDefaultMeasure(task)))
-  if (is.null(control)) {
-    control = makeMBOControl()
-    control = setMBOControlTermination(control, iters = iterations, time.budget = time.budget)
-  }
-  par.set = coalesce(par.set, autoxgboost::autoxgbparset)
-
 
   tt = getTaskType(task)
   td = getTaskDesc(task)
@@ -71,9 +57,7 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
     pv$nthread = nthread
 
   # create base.learner
-
   if (tt == "classif") {
-
     predict.type = ifelse("req.prob" %in% measure$properties | tune.threshold, "prob", "response")
     if(length(td$class.levels) == 2) {
       objective = "binary:logistic"
@@ -87,7 +71,6 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
     base.learner = makeLearner("classif.xgboost.earlystop", id = "classif.xgboost.earlystop", predict.type = predict.type,
       eval_metric = eval_metric, objective = objective, early_stopping_rounds = early.stopping.rounds, maximize = !measure$minimize,
       max.nrounds = max.nrounds, par.vals = pv)
-
   } else if (tt == "regr") {
     predict.type = NULL
     objective = "reg:linear"
@@ -102,7 +85,6 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
   }
 
   # Create pipeline
-
   preproc.pipeline = NULLCPO
 
   #if (!is.null(task$feature.information$timestamps))
@@ -110,12 +92,10 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
   if (has.cat.feats) {
     preproc.pipeline %<>>% generateCatFeatPipeline(task, impact.encoding.boundary)
   }
-
   preproc.pipeline %<>>% cpoDropConstants()
 
 
   # process data and apply pipeline
-
   # split early stopping data
   rinst = makeResampleInstance(makeResampleDesc("Holdout", split = early.stopping.fraction), task)
   task.test = subsetTask(task, rinst$test.inds[[1]])
@@ -149,11 +129,8 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
     },
     par.set = par.set, noisy = TRUE, has.simple.signature = FALSE, minimize = measure$minimize)
 
-
   des = generateDesign(n = design.size, par.set)
-
   optim.result = mbo(fun = opt, control = control, design = des, learner = mbo.learner)
-
 
   lrn = buildFinalLearner(optim.result, objective, predict.type, par.set = par.set, preproc.pipeline = preproc.pipeline)
 
@@ -168,5 +145,4 @@ autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160
     measure = measure,
     preproc.pipeline = preproc.pipeline
   )
-
 }

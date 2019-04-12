@@ -119,7 +119,9 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
       self$build.final.model = assert_flag(build.final.model)
       # Set defaults
       if (is.null(control)) {
-        self$control = setMBOControlTermination(makeMBOControl(), iters = iterations,
+        measures_ids = sapply(self$measures, x$id)
+        ctrl = makeMBOControl(n.objectives = length(measures_ids), y.name = measures_ids)
+        self$control = setMBOControlTermination(ctrl, iters = iterations,
           time.budget = time.budget)
       }
       if (length(self$measures) == 1L) {
@@ -133,7 +135,7 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
           mbo.learner = self$mbo.learner, nthread = self$nthread,
           tune.threshold = self$tune.threshold)
       } else {
-        self$model = autoxgboostmc(task, measures = self$measures[[1]], control = self$control,
+        self$model = autoxgboostmc(task, measures = self$measures, control = self$control,
           iterations = iterations, time.budget = time.budget, par.set = self$parset,
           max.nrounds = self$max.nrounds, early.stopping.rounds = self$early.stopping.rounds,
           early.stopping.fraction = self$early.stopping.fraction,
