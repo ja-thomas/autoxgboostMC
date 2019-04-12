@@ -12,7 +12,7 @@ test_that("autoxgboostMC works on different tasks",  {
     axgb = AutoxgboostMC$new(measure = auc)
     axgb$fit(t, time.budget = 5L)
     expect_true(!is.null(axgb$model))
-    p = axgb$predict(iris.task)
+    p = axgb$predict(t)
     expect_class(p, "Prediction")
   }
 })

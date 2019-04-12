@@ -9,7 +9,7 @@
 #' Both the parameter set and the control object can be set by the user.
 #'
 #' Arguments to `.$new()`
-#' @param measure [list of \code{\link[mlr]{Measure}}]\cr
+#' @param measures [list of \code{\link[mlr]{Measure}}]\cr
 #'   Performance measure. If \code{NULL} \code{\link[mlr]{getDefaultMeasure}} is used.
 #' @param parset [\code{\link[ParamHelpers]{ParamSet}}]\cr
 #'   Parameter set to tune over. Default is \code{\link{autoxgbparset}}.
@@ -76,7 +76,7 @@
 #' }
 AutoxgboostMC = R6::R6Class("AutoxgboostMC",
   public = list(
-    measure = NULL,
+    measures = NULL,
 
     control = NULL,
     parset = NULL,
@@ -97,11 +97,13 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
     total_iterations = 0L,
     total_time = 0L,
 
-    initialize = function(measure = NULL, parset = NULL, nthread = NULL) {
-      # set defaults
-      self$measure = coalesce(self$measure, getDefaultMeasure(task))
+    initialize = function(measures = NULL, parset = NULL, nthread = NULL) {
+      assert_list(measures, types = "Measure", null.ok = TRUE)
+      assert_class(par.set, "ParamSet", null.ok = TRUE)
+      # Set defaults
+      self$measures = coalesce(measures, list(getDefaultMeasure(task)))
       self$parset = coalesce(parset, autoxgboostMC::autoxgbparset)
-      self$nthread = assertIntegerish(nthread, lower = 1, len = 1L, null.ok = TRUE)
+      self$nthread = assert_integerish(nthread, lower = 1, len = 1L, null.ok = TRUE)
     },
 
     print = function(...) {
@@ -110,23 +112,36 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
     },
 
     fit = function(task, iterations = 160L, time.budget = 3600L, build.final.model = TRUE, control = NULL) {
-      assertClass(task, "SupervisedTask")
-      self$iterations = assertIntegerish(iterations)
-      self$time.budget = assertIntegerish(time.budget)
-      self$build.final.model = assertFlag(build.final.model)
+      assert_class(task, "SupervisedTask")
+      assert_class(control, "MBOControl", null.ok = TRUE)
+      self$iterations = assert_integerish(iterations)
+      self$time.budget = assert_integerish(time.budget)
+      self$build.final.model = assert_flag(build.final.model)
+      # Set defaults
       if (is.null(control)) {
         self$control = setMBOControlTermination(makeMBOControl(), iters = iterations,
           time.budget = time.budget)
       }
-      # For now we delegate to autoxgboost
-      self$model = autoxgboost(task, measure = self$measure, control = self$control,
-        iterations = iterations, time.budget = time.budget, par.set = self$parset,
-        max.nrounds = self$max.nrounds, early.stopping.rounds = self$early.stopping.rounds,
-        early.stopping.fraction = self$early.stopping.fraction,
-        build.final.model = build.final.model, design.size = self$design.size,
-        impact.encoding.boundary = self$impact.encoding.boundary,
-        mbo.learner = self$mbo.learner, nthread = self$nthread,
-        tune.threshold = self$tune.threshold)
+      if (length(self$measures) == 1L) {
+        # For now we delegate to autoxgboost
+        self$model = autoxgboost(task, measures = self$measures[[1]], control = self$control,
+          iterations = iterations, time.budget = time.budget, par.set = self$parset,
+          max.nrounds = self$max.nrounds, early.stopping.rounds = self$early.stopping.rounds,
+          early.stopping.fraction = self$early.stopping.fraction,
+          build.final.model = build.final.model, design.size = self$design.size,
+          impact.encoding.boundary = self$impact.encoding.boundary,
+          mbo.learner = self$mbo.learner, nthread = self$nthread,
+          tune.threshold = self$tune.threshold)
+      } else {
+        self$model = autoxgboostmc(task, measures = self$measures[[1]], control = self$control,
+          iterations = iterations, time.budget = time.budget, par.set = self$parset,
+          max.nrounds = self$max.nrounds, early.stopping.rounds = self$early.stopping.rounds,
+          early.stopping.fraction = self$early.stopping.fraction,
+          build.final.model = build.final.model, design.size = self$design.size,
+          impact.encoding.boundary = self$impact.encoding.boundary,
+          mbo.learner = self$mbo.learner, nthread = self$nthread,
+          tune.threshold = self$tune.threshold)
+      }
       self$total_iterations = self$total_iterations + self$iterations
       self$total_time = self$total_time + self$time.budget
     },
@@ -136,31 +151,31 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
     },
 
     set_max_nrounds = function(value) {
-       self$max.nrounds = assertIntegerish(value, lower = 1L, len = 1L)
+       self$max.nrounds = assert_integerish(value, lower = 1L, len = 1L)
     },
     set_early_stopping_rounds = function(value) {
-       self$early.stopping.rounds = assertIntegerish(value, lower = 1L, len = 1L)
+       self$early.stopping.rounds = assert_integerish(value, lower = 1L, len = 1L)
     },
     set_early_stopping_fraction = function(value) {
-      self$early.stopping.fraction = assertNumeric(early.stopping.fraction, lower = 0, upper = 1, len = 1L)
+      self$early.stopping.fraction = assert_numeric(early.stopping.fraction, lower = 0, upper = 1, len = 1L)
     },
     set_design_size = function(value) {
-      self$design.size = assertIntegerish(design.size, lower = 1L, len = 1L)
+      self$design.size = assert_integerish(design.size, lower = 1L, len = 1L)
     },
     set_tune_threshold = function(value) {
-      self$tune.threshold = assertFlag(value)
+      self$tune.threshold = assert_flag(value)
     },
     set_impact_encoding_boundary = function(value) {
-      self$impact_encoding_boundary = assertIntegerish(value, lower = 0, len = 1L)
+      self$impact_encoding_boundary = assert_integerish(value, lower = 0, len = 1L)
     },
     set_nthread = function(value) {
-      self$nthread = assertIntegerish(value, lower = 1, len = 1L, null.ok = TRUE)
+      self$nthread = assert_integerish(value, lower = 1, len = 1L, null.ok = TRUE)
     },
-    set_measure = function(value) {
-      self$measure = assertClass(measure, "Measure", null.ok = TRUE)
+    set_measures = function(value) {
+      self$measures = assert_list(value, types = "Measure", null.ok = TRUE)
     },
     set_parset = function(value) {
-      self$parset = assertClass(value, "ParamSet", null.ok = TRUE)
+      self$parset = assert_class(value, "ParamSet", null.ok = TRUE)
     }
   )
 )

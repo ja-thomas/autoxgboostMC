@@ -1,4 +1,4 @@
-#' @title Fit and optimize a xgboost model.
+#' @title Fit and optimize a xgboost model for multiple criteria.
 #'
 #' @description
 #' An xgboost model is optimized based on a measure (see [\code{\link[mlr]{Measure}}]).
@@ -7,49 +7,11 @@
 #' Without any specification of the control object, the optimizer runs for for 80 iterations or 1 hour, whatever happens first.
 #' Both the parameter set and the control object can be set by the user.
 #'
+#' For params, see `?autoxgboost`.
 #'
-#' @param task [\code{\link[mlr]{Task}}]\cr
-#'   The task.
-#' @param measure [\code{\link[mlr]{Measure}}]\cr
-#'   Performance measure. If \code{NULL} \code{\link[mlr]{getDefaultMeasure}} is used.
-#' @param control [\code{\link[mlrMBO]{MBOControl}}]\cr
-#'   Control object for optimizer.
-#'   If not specified, the default \code{\link[mlrMBO]{makeMBOControl}}] object will be used with
-#'   \code{iterations} maximum iterations and a maximum runtime of \code{time.budget} seconds.
-#' @param iterations [\code{integer(1L}]\cr
-#'   Number of MBO iterations to do. Will be ignored if custom \code{control} is used.
-#'   Default is \code{160}.
-#' @param time.budget [\code{integer(1L}]\cr
-#'   Time that can be used for tuning (in seconds). Will be ignored if custom \code{control} is used.
-#'   Default is \code{3600}, i.e., one hour.
-#' @param par.set [\code{\link[ParamHelpers]{ParamSet}}]\cr
-#'   Parameter set to tune over. Default is \code{\link{autoxgbparset}}.
-#' @param max.nrounds [\code{integer(1)}]\cr
-#'   Maximum number of allowed boosting iterations. Default is \code{10^6}.
-#' @param early.stopping.rounds [\code{integer(1L}]\cr
-#'   After how many iterations without an improvement in the boosting OOB error should be stopped?
-#'   Default is \code{10}.
-#' @param build.final.model [\code{logical(1)}]\cr
-#'   Should the model with the best found configuration be refitted on the complete dataset?
-#'   Default is \code{FALSE}.
-#' @param early.stopping.fraction [\code{numeric(1)}]\cr
-#'   What fraction of the data should be used for early stopping (i.e. as a validation set).
-#'   Default is \code{4/5}.
-#' @param design.size [\code{integer(1)}]\cr
-#'   Size of the initial design. Default is \code{15L}.
-#' @param impact.encoding.boundary [\code{integer(1)}]\cr
-#'   Defines the threshold on how factor variables are handled. Factors with more levels than the \code{"impact.encoding.boundary"} get impact encoded while factor variables with less or equal levels than the \code{"impact.encoding.boundary"} get dummy encoded.
-#'   For \code{impact.encoding.boundary = 0L}, all factor variables get impact encoded while for \code{impact.encoding.boundary = .Machine$integer.max}, all of them get dummy encoded.
-#'   Default is \code{10}.
-#' @param mbo.learner [\code{\link[mlr]{Learner}}]\cr
-#'   Regression learner from mlr, which is used as a surrogate to model our fitness function.
-#'   If \code{NULL} (default), the default learner is determined as described here: \link[mlrMBO]{mbo_default_learner}.
-#' @param nthread [integer(1)]\cr
-#'   Number of cores to use.
-#'   If \code{NULL} (default), xgboost will determine internally how many cores to use.
-#' @param tune.threshold [logical(1)]\cr
-#'   Should thresholds be tuned? This has only an effect for classification, see \code{\link[mlr]{tuneThreshold}}.
-#'   Default is \code{TRUE}.
+#' @param measures [\code{list of \link[mlr]{Measure}}]\cr
+#'   Performance measures. If \code{NULL} \code{\link[mlr]{getDefaultMeasure}} is used.
+#'
 #' @return \code{\link{AutoxgbResult}}
 #' @export
 #' @examples
@@ -60,7 +22,7 @@
 #' res = autoxgboost(iris.task, control = ctrl, tune.threshold = FALSE)
 #' res
 #' }
-autoxgboost = function(task, measure = NULL, control = NULL, iterations = 160L, time.budget = 3600L,
+autoxgboostmc = function(task, measures = NULL, control = NULL, iterations = 160L, time.budget = 3600L,
   par.set = NULL, max.nrounds = 10^6, early.stopping.rounds = 10L, early.stopping.fraction = 4/5,
   build.final.model = TRUE, design.size = 15L, impact.encoding.boundary = 10L, mbo.learner = NULL,
   nthread = NULL, tune.threshold = TRUE) {
@@ -68,7 +30,7 @@ autoxgboost = function(task, measure = NULL, control = NULL, iterations = 160L, 
 
   # check inputs
   assertClass(task, "SupervisedTask")
-  assertClass(measure, "Measure", null.ok = TRUE)
+  assertList(measures, type = "Measure", null.ok = TRUE)
   assertClass(control, "MBOControl", null.ok = TRUE)
   assertIntegerish(iterations)
   assertIntegerish(time.budget)
@@ -82,8 +44,18 @@ autoxgboost = function(task, measure = NULL, control = NULL, iterations = 160L, 
   assertIntegerish(nthread, lower = 1, len = 1L, null.ok = TRUE)
   assertFlag(tune.threshold)
 
+  is_thresholded_measure = sapply(measures, function(x) {
+    props = getMeasureProperties(x)
+    any(props == "req.truth") & !any(props == "req.prob")
+  })
+  if (!any(is_thresholded_measure) & tune.threshold) {
+    warning("Threshold tuning is active, but no measure for tuning thresholds!
+      Skipping threshold tuning!")
+    tune.threshold = FALSE
+  }
+
   # set defaults
-  measure = coalesce(measure, getDefaultMeasure(task))
+  measures = coalesce(measures, list(getDefaultMeasure(task)))
   if (is.null(control)) {
     control = makeMBOControl()
     control = setMBOControlTermination(control, iters = iterations, time.budget = time.budget)
@@ -154,7 +126,7 @@ autoxgboost = function(task, measure = NULL, control = NULL, iterations = 160L, 
   base.learner = setHyperPars(base.learner, early.stopping.data = task.test)
 
   # Optimize
-  opt = smoof::makeSingleObjectiveFunction(name = "optimizeWrapper",
+  opt = smoof::makeMultiObjectiveFunction(name = "optimizeWrapperMultiCrit",
     fn = function(x) {
       x = x[!vlapply(x, is.na)]
       lrn = setHyperPars(base.learner, par.vals = x)
@@ -162,18 +134,20 @@ autoxgboost = function(task, measure = NULL, control = NULL, iterations = 160L, 
       pred = predict(mod, task.test)
       nrounds = getBestIteration(mod)
 
+      # FIXME: We might want to tune the threshold for all (?) measures?
+      # For now we tune threshold of first applicable one.
       if (tune.threshold && getTaskType(task.train) == "classif") {
-        tune.res = tuneThreshold(pred = pred, measure = measure)
-        res = tune.res$perf
+        tune.res = tuneThreshold(pred = pred, measure = measures[is_thresholded_measure][[1]])
+        # FIXME: Does order matter?
+        res = c(performance(pred, measures[is_thresholded_measure], tune.res$perf)
         attr(res, "extras") = list(nrounds = nrounds, .threshold = tune.res$th)
       } else {
-        res = performance(pred, measure)
+        res = performance(pred, measures)
         attr(res, "extras") = list(nrounds = nrounds)
       }
-
-      res
-
-    }, par.set = par.set, noisy = TRUE, has.simple.signature = FALSE, minimize = measure$minimize)
+      return(res)
+    },
+    par.set = par.set, noisy = TRUE, has.simple.signature = FALSE, minimize = measure$minimize)
 
 
   des = generateDesign(n = design.size, par.set)
