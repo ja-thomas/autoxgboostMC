@@ -3,10 +3,8 @@
 <img align="right" src="https://raw.githubusercontent.com/ja-thomas/autoxgboost/master/man/figures/hexagon.svg?sanitize=true" width="125px">
 
 
-[![Build Status](https://travis-ci.org/ja-thomas/autoxgboost.svg?branch=master)](https://travis-ci.org/ja-thomas/autoxgboost)
-[![Coverage Status](https://coveralls.io/repos/github/ja-thomas/autoxgboost/badge.svg?branch=master)](https://coveralls.io/github/ja-thomas/autoxgboost?branch=master)
-[![CRAN Status Badge](http://www.r-pkg.org/badges/version/autoxgboost)](https://CRAN.R-project.org/package=autoxgboost)
-[![CRAN Downloads](http://cranlogs.r-pkg.org/badges/autoxgboost)](https://cran.rstudio.com/web/packages/autoxgboost/index.html)
+[![Build Status](https://travis-ci.org/pfistfl/autoxgboostMC.svg?branch=master)](https://travis-ci.org/pfistfl/autoxgboostMC)
+[![Coverage Status](https://coveralls.io/repos/github/pfistfl/autoxgboostMC/badge.svg?branch=master)](https://coveralls.io/github/pfistfl/autoxgboostMC?branch=master)
 
 
 * Installing the development version
