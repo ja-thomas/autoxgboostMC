@@ -1,6 +1,6 @@
 context("AutoxgboostMC")
-test_that("autoxgboostMC works on different tasksfor single measure",  {
 
+test_that("autoxgboostMC works on different tasksfor single measure",  {
   tasks = list(
     sonar.task, # binary classification
     iris.fac,   # binary classification with factors
@@ -15,7 +15,6 @@ test_that("autoxgboostMC works on different tasksfor single measure",  {
     p = axgb$predict(t)
     expect_class(p, "Prediction")
   }
-
 })
 
 test_that("autoxgboostMC works on different tasks",  {
@@ -45,7 +44,7 @@ test_that("Multiple measures work",  {
 
 test_that("New measures work",  {
     fairf11 = setMeasurePars(fairf1, grouping = function(df) as.factor(df$age > 30))
-    axgb = AutoxgboostMC$new(measures = list(acc, fairf11, sparsity))
+    axgb = AutoxgboostMC$new(measures = list(acc, fairf11, timepredict))
     axgb$fit(pid.task, time.budget = 10L)
     expect_true(!is.null(axgb$model))
     p = axgb$predict(pid.task)

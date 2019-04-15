@@ -54,9 +54,9 @@ AutoxgbResult = R6::R6Class("AutoxgbResult",
 
     if (!is.null(thr)) {
       if (length(thr) == 1) {
-        catf("Classification Threshold: %.3f", thr)
+        catf("\nClassification Threshold: %.3f", thr)
       } else {
-        catf("Classification Thresholds: %s", paste(names(thr), round(thr, 3), sep = ": ", collapse = "; "))
+        catf("\nClassification Thresholds: %s", paste(names(thr), round(thr, 3), sep = ": ", collapse = "; "))
       }
     }
   },
@@ -72,3 +72,9 @@ AutoxgbResult = R6::R6Class("AutoxgbResult",
   }
   )
 )
+
+
+# Get the iteration parameter of a fitted xboost model with early stopping
+getBestIteration = function(mod) {
+  getLearnerModel(mod, more.unwrap = TRUE)$best_iteration
+}

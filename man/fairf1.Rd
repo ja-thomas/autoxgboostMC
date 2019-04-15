@@ -3,12 +3,12 @@
 \docType{data}
 \name{fairf1}
 \alias{fairf1}
-\title{Squared difference in F1 Scores between groups}
+\title{Variance of F1 Scores between groups}
 \format{An object of class \code{Measure} of length 10.}
 \usage{
 fairf1
 }
 \description{
-Squared difference in F1 Scores between groups
+Variance of F1 Scores between groups
 }
 \keyword{datasets}
