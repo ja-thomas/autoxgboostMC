@@ -1,9 +1,10 @@
 #' Squared difference in F1 Scores between groups
 #' @export
-fairf1 = mlr::makeMeasure(id = "fairness.f1", minimize = TRUE, properties = c("classif", "response"),
+fairf1 = mlr::makeMeasure(id = "fairness.f1", minimize = TRUE, properties = c("classif", "response", "req.task"),
   extra.args = list(groupvar = NULL), best = 0, worst = 1,
   fun = function(task, model, pred, feats, extra.args) {
-    fs = aggregate(as.formula(paste0("truth + response ~ ", extra.args$var)), pred$data, 
+    pred$data[[groupvar]] = getTaskData(task)[[groupvar]]
+    fs = aggregate(as.formula(paste0("truth + response ~ ", extra.args$groupvar)), pred$data,
       function(truth, response) {
         measureF1(truth, response, pred$task.desc$positive)
     })
@@ -13,10 +14,11 @@ fairf1 = mlr::makeMeasure(id = "fairness.f1", minimize = TRUE, properties = c("c
 
 #' Squared difference in False Postive rate between groups
 #' @export
-fairfpr = mlr::makeMeasure(id = "fairness.f1", minimize = TRUE, properties = c("classif", "response"),
+fairfpr = mlr::makeMeasure(id = "fairness.f1", minimize = TRUE, properties = c("classif", "response", "req.task"),
   extra.args = list(groupvar = NULL), best = 0, worst = 1,
   fun = function(task, model, pred, feats, extra.args) {
-    fs = aggregate(as.formula(paste0("truth + response ~ ", extra.args$groupvar)), pred$data, 
+    pred$data[[groupvar]] = getTaskData(task)[[groupvar]]
+    fs = aggregate(as.formula(paste0("truth + response ~ ", extra.args$groupvar)), pred$data,
       function(truth, response) {
         measureFPR(truth, response, pred$task.desc$positive)
     })

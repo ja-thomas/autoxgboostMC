@@ -3,8 +3,8 @@
 #' @description
 #' An xgboost model is optimized based on a set of measures (see [\code{\link[mlr]{Measure}}]).
 #' The bounds of the parameter in which the model is optimized, are defined by \code{\link{autoxgbparset}}.
-#' For the optimization itself bayesian optimization with \pkg{mlrMBO} is used.
-#' Without any specification of the control object, the optimizer runs for for 80 iterations or 1 hour,
+#' For the optimization itself Bayesian Optimization with \pkg{mlrMBO} is used.
+#' Without any specification of the control object, the optimizer runs for for 160 iterations or 1 hour,
 #' whichever happens first.
 #' Both the parameter set and the control object can be set by the user.
 #'
@@ -26,7 +26,7 @@
 #'   Number of MBO iterations to do. Will be ignored if custom \code{control} is used.
 #'   Default is \code{160}.
 #' @param time.budget [\code{integer(1L}]\cr
-#'   Time that can be used for tuning (in seconds). Will be ignored if custom \code{control} is used.
+#'   Time that can be used for tuning (in seconds). Will be ignored if a custom \code{control} is used.
 #'   Default is \code{3600}, i.e., one hour.
 #' @param build.final.model [\code{logical(1)}]\cr
 #'   Should the model with the best found configuration be refitted on the complete dataset?
@@ -89,10 +89,14 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
     early.stopping.rounds = 10L,
     early.stopping.fraction = 4/5,
     impact.encoding.boundary = 10L,
-    tune.threshold = TRUE, # FIXME: Set this to FALSE if measure does not work with prob?
+    tune.threshold = TRUE,
     nthread = NULL,
+    resample_instance = NULL,
 
+    baselearner = NULL,
+    preproc.pipeline = NULL,
     model = NULL,
+    optim.result = NULL,
     build.final.model = NULL,
     total_iterations = 0L,
     total_time = 0L,
@@ -124,6 +128,7 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
         self$control = setMBOControlTermination(ctrl, iters = iterations,
           time.budget = time.budget)
       }
+
       if (length(self$measures) == 1L) {
         # For now we delegate to autoxgboost
         self$model = autoxgboost(task, measure = self$measures[[1]], control = self$control,
@@ -135,22 +140,46 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
           mbo.learner = self$mbo.learner, nthread = self$nthread,
           tune.threshold = self$tune.threshold)
       } else {
-        self$model = autoxgboostmc(task, measures = self$measures, control = self$control,
-          iterations = iterations, time.budget = time.budget, par.set = self$parset,
-          max.nrounds = self$max.nrounds, early.stopping.rounds = self$early.stopping.rounds,
-          early.stopping.fraction = self$early.stopping.fraction,
-          build.final.model = build.final.model, design.size = self$design.size,
-          impact.encoding.boundary = self$impact.encoding.boundary,
-          mbo.learner = self$mbo.learner, nthread = self$nthread,
-          tune.threshold = self$tune.threshold)
+        self$model = self$autoxgboostmc(task)
       }
       self$total_iterations = self$total_iterations + self$iterations
       self$total_time = self$total_time + self$time.budget
     },
 
     predict = function(newdata) {
-      predict(self$model$final.model, newdata)
+      predict(self$model, newdata)
     },
+
+    autoxgboostmc = function(task) {
+      self$baselearner = make_baselearner(task)
+      transf_tasks = build_transform_pipeline(task)
+      self$baselearner = setHyperPars(self$baselearner, early.stopping.data = transf_tasks$task.test)
+      self$obj.fun = make_objective_function(transf_tasks$task.train)
+      self$optim.result = optimize_pipeline()
+      lrn = buildFinalLearner(self$optim.result, par.set = self$parset,
+        preproc.pipeline = self$preproc.pipeline)
+      mod = NULL
+      if(build.final.model) mod = train(lrn, task)
+      makeS3Obj("AutoxgbResult",
+        optim.result = self$optim.result,
+        final.learner = self$lrn,
+        final.model = mod,
+        measure = measures,
+        preproc.pipeline = self$preproc.pipeline
+      )
+    },
+
+    # autoxgboost steps
+    make_baselearner = make_baselearner,
+    build_transform_pipeline = build_transform_pipeline,
+    make_objective_function = make_objective_function,
+    optimize_pipeline = function() {
+      self$control = setMBOControlMultiObj(self$control, method = "dib",dib.indicator = "eps")
+      self$control = setMBOControlInfill(self$control, crit = makeMBOInfillCritDIB(cb.lambda = 2L))
+      des = generateDesign(n = self$design.size, self$par.set)
+      mbo(fun = self$objective_function, control = self$control, design = des, learner = self$mbo.learner)
+    },
+    build_final_learner = build_final_learner,
 
     set_max_nrounds = function(value) {
        self$max.nrounds = assert_integerish(value, lower = 1L, len = 1L)
@@ -178,52 +207,154 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
     },
     set_parset = function(value) {
       self$parset = assert_class(value, "ParamSet", null.ok = TRUE)
+    },
+    set_resample_instance = function(value) {
+      self$resample_instance = assert_class(value, "ResampleInstance", null.ok = TRUE)
     }
   ),
-  private = list(
-    make_baselearner = make_baselearner
+  active = list(
+    early_stopping_measure = function(value) {
+      if (missing(value)) {
+        self$measures[[1]]
+      } else {
+        measure_ids = sapply(self$measures, function(x)  x$id)
+        assert_list(value, types = "Measure", null.ok = TRUE)
+        self$measures = c(value, self$measures[-which(value$id == measure_ids)])
+        messagef("Setting %s as early stopping measure!", value$id)
+      }
+    }
   )
 )
 
-# # Create the baselearner for a given task and measure
-# make_baselearner = function(task, measure) {
-#   req_prob_measure = sapply(self$measures, function(x) {
-#     any(getMeasureProperties(x) == "req.prob")
-#   })
-#   tt = getTaskType(task)
-#   td = getTaskDesc(task)
-#   has.cat.feats = sum(td$n.feat[c("factors", "ordered")]) > 0
-#   pv = list()
-#   if (!is.null(nthread))
-#     pv$nthread = self$nthread
 
-#   # create base.learner
-#   if (tt == "classif") {
-#     predict.type = ifelse(any(req_prob_measure) | self$tune.threshold, "prob", "response")
-#     if(length(td$class.levels) == 2) {
-#       objective = "binary:logistic"
-#       eval_metric = "error"
-#       par.set = c(par.set, makeParamSet(makeNumericParam("scale_pos_weight", lower = -10, upper = 10, trafo = function(x) 2^x)))
-#     } else {
-#       objective = "multi:softprob"
-#       eval_metric = "merror"
-#     }
-#     base.learner = makeLearner("classif.xgboost.earlystop", id = "classif.xgboost.earlystop", predict.type = predict.type,
-#       eval_metric = eval_metric, objective = objective, early_stopping_rounds = self$early.stopping.rounds, maximize = !measure[[1]]$minimize,
-#       max.nrounds = self$max.nrounds, par.vals = pv)
+# Create the baselearner for a given task and measure
+make_baselearner = function(task, measures) {
+  tt = getTaskType(task)
+  td = getTaskDesc(task)
+  req_prob_measure = sapply(self$measures, function(x) {
+    any(getMeasureProperties(x) == "req.prob")
+  })
 
-#   } else if (tt == "regr") {
-#     predict.type = NULL
-#     objective = "reg:linear"
-#     eval_metric = "rmse"
-#     base.learner = makeLearner("regr.xgboost.earlystop", id = "regr.xgboost.earlystop",
-#       eval_metric = eval_metric, objective = objective, early_stopping_rounds = self$early.stopping.rounds, maximize = !measure[[1]]$minimize,
-#       max.nrounds = self$max.nrounds, par.vals = pv)
+  pv = list()
+  if (!is.null(nthread))
+    pv$nthread = self$nthread
 
-#   } else {
-#     stop("Task must be regression or classification")
-#   }
-#   return(base.learner)
-# }
+  if (tt == "classif") {
+    predict.type = ifelse(any(req_prob_measure) | self$tune.threshold, "prob", "response")
+    if(length(td$class.levels) == 2) {
+      objective = "binary:logistic"
+      eval_metric = "error"
+      par.set = c(par.set, makeParamSet(makeNumericParam("scale_pos_weight", lower = -10, upper = 10, trafo = function(x) 2^x)))
+    } else {
+      objective = "multi:softprob"
+      eval_metric = "merror"
+    }
+    base.learner = makeLearner("classif.xgboost.earlystop", id = "classif.xgboost.earlystop",
+      predict.type = predict.type, eval_metric = eval_metric, objective = objective,
+      early_stopping_rounds = self$early.stopping.rounds, maximize = !self$early_stopping_measure$minimize,
+      max.nrounds = self$max.nrounds, par.vals = pv)
+
+  } else if (tt == "regr") {
+    predict.type = NULL
+    objective = "reg:linear"
+    eval_metric = "rmse"
+    base.learner = makeLearner("regr.xgboost.earlystop", id = "regr.xgboost.earlystop",
+      eval_metric = eval_metric, objective = objective, early_stopping_rounds = self$early.stopping.rounds,
+      maximize = !self$early_stopping_measure$minimize, max.nrounds = self$max.nrounds, par.vals = pv)
+
+  } else {
+    stop("Task must be regression or classification")
+  }
+  return(base.learner)
+}
 
 
+# Build pipeline
+build_transform_pipeline = function(task) {
+  td = getTaskDesc(task)
+  has.cat.feats = sum(td$n.feat[c("factors", "ordered")]) > 0
+  self$preproc.pipeline = NULLCPO
+  #if (!is.null(task$feature.information$timestamps))
+  #  preproc.pipeline %<>>% cpoExtractTimeStampInformation(affect.names = unlist(task$feature.information$timestamps))
+  if (has.cat.feats) {
+    self$preproc.pipeline %<>>% generateCatFeatPipeline(task, self$impact.encoding.boundary)
+  }
+  self$preproc.pipeline %<>>% cpoDropConstants()
+
+  # process data and apply pipeline
+  # split early stopping data
+  if (is.null(self$resample_instance))
+    self$resample_instance = makeResampleInstance(makeResampleDesc("Holdout", split = self$early.stopping.fraction), task)
+
+  task.test =  subsetTask(task, self$resample_instance$test.inds[[1]])
+  task.train = subsetTask(task, self$resample_instance$train.inds[[1]])
+
+  task.train %<>>% preproc.pipeline
+  task.test %<>>% retrafo(task.train)
+  return(list(task.train, task.test))
+}
+
+#' Objective function we want to optimize.
+#' @param task.train
+make_objective_function = function(task.train, measures) {
+
+  is_thresholded_measure = sapply(measures, function(x) {
+    props = getMeasureProperties(x)
+    any(props == "req.truth") & !any(props == "req.prob")
+  })
+  if (!any(is_thresholded_measure) & tune.threshold) {
+    warning("Threshold tuning is active, but no measure for tuning thresholds!
+      Skipping threshold tuning!")
+    tune.threshold = FALSE
+  }
+  smoof::makeMultiObjectiveFunction(name = "optimizeWrapperMultiCrit",
+    fn = function(x) {
+      x = x[!vlapply(x, is.na)]
+      lrn = setHyperPars(self$base.learner, par.vals = x)
+      mod = train(lrn, task.train)
+      pred = predict(mod, task.test)
+      nrounds = getBestIteration(mod)
+
+      # FIXME: We might want to tune the threshold for all (?) measures?
+      # For now we tune threshold of first applicable one.
+      if (tune.threshold && getTaskType(task.train) == "classif") {
+        tune.res = tuneThreshold(pred = pred, measure = measures[is_thresholded_measure][[1]])
+        # FIXME: Does order matter?
+        res = c(performance(pred, measures[!is_thresholded_measure], model = mod, task = task), tune.res$perf)
+        attr(res, "extras") = list(nrounds = nrounds, .threshold = tune.res$th)
+      } else {
+        res = performance(pred, measures, model = mod, task = task)
+        attr(res, "extras") = list(nrounds = nrounds)
+      }
+      return(res)
+    },
+    par.set = self$par.set, noisy = FALSE, has.simple.signature = FALSE, minimize =  sapply(measures, function(x) x$minimize),
+    n.objectives = length(measures)
+  )
+}
+
+# Create xgboost learner based on the optimization result
+build_final_learner = function() {
+
+  nrounds = getBestNrounds(self$optim.result)
+  pars = trafoValue(self$parset, self$optim.result$x)
+  pars = pars[!vlapply(pars, is.na)]
+
+  lrn = if (!is.null(self$baselearner$predict.type)) {
+    makeLearner("classif.xgboost.custom", nrounds = nrounds,
+      objective = self$baselearner$par.vals$objective,
+      predict.type = self$baselearner$predict.type,
+      predict.threshold = getThreshold(optim.result))
+  } else {
+    makeLearner("regr.xgboost.custom", nrounds = nrounds, objective = objective)
+  }
+  lrn = setHyperPars2(lrn, par.vals = pars)
+
+  lrn = self$preproc.pipeline %>>% lrn
+
+
+  #FIXME mlrCPO #39
+  #lrn$properties = c(lrn$properties, "weights")
+
+  return(lrn)
+}
