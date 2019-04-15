@@ -1,0 +1,30 @@
+language: r
+sudo : false
+cache: packages
+
+r:
+  - release
+
+r_packages:
+  - mlr
+  - ParamHelpers
+  - smoof
+  - mlrMBO
+  - xgboost
+  - parallelMap
+  - rpart
+  - cmaes
+  - rgenoud
+  - checkmate
+  - FeatureHashing
+  - lubridate
+  - mlrCPO
+
+r_github_packages:
+  - jimhester/covr
+  - eddelbuettel/anytime
+
+warnings_are_errors: true
+
+after_success:
+  - Rscript -e 'covr::coveralls()'
