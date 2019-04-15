@@ -12,6 +12,10 @@ AutoxgboostMC
 \item{measures}{[list of \code{\link[mlr]{Measure}}]\cr
 Performance measure. If \code{NULL} \code{\link[mlr]{getDefaultMeasure}} is used.}
 
+\item{early_stopping_measure}{[\code{\link[mlr]{Measure}}]\cr
+Performance measure used for early stopping. Picks the first measure
+defined in measures by default.}
+
 \item{parset}{[\code{\link[ParamHelpers]{ParamSet}}]\cr
 Parameter set to tune over. Default is \code{\link{autoxgbparset}}.
 Can be updated using `.$set_parset()`.}
@@ -31,7 +35,7 @@ Number of MBO iterations to do. Will be ignored if custom \code{control} is used
 Default is \code{160}.}
 
 \item{time.budget}{[\code{integer(1L}]\cr
-Time that can be used for tuning (in seconds). Will be ignored if custom \code{control} is used.
+Time that can be used for tuning (in seconds). Will be ignored if a custom \code{control} is used.
 Default is \code{3600}, i.e., one hour.}
 
 \item{build.final.model}{[\code{logical(1)}]\cr
@@ -43,7 +47,7 @@ Default is \code{FALSE}.}
   If not specified, the default \code{\link[mlrMBO]{makeMBOControl}}] object will be used with
   \code{iterations} maximum iterations and a maximum runtime of \code{time.budget} seconds.
 
-Additional Arguments:}
+Additional arguments that control the process:}
 
 \item{mbo.learner}{[\code{\link[mlr]{Learner}}]\cr
 Regression learner from mlr, which is used as a surrogate to model our fitness function.
@@ -83,12 +87,12 @@ Can be set via `.$set_tune_threshold()`.}
 \description{
 An xgboost model is optimized based on a set of measures (see [\code{\link[mlr]{Measure}}]).
 The bounds of the parameter in which the model is optimized, are defined by \code{\link{autoxgbparset}}.
-For the optimization itself bayesian optimization with \pkg{mlrMBO} is used.
-Without any specification of the control object, the optimizer runs for for 80 iterations or 1 hour,
+For the optimization itself Bayesian Optimization with \pkg{mlrMBO} is used.
+Without any specification of the control object, the optimizer runs for for 160 iterations or 1 hour,
 whichever happens first.
 Both the parameter set and the control object can be set by the user.
 
-Arguments to `.$new()`
+Arguments to `.$new()`:
 }
 \examples{
 \donttest{
