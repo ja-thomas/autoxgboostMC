@@ -8,7 +8,7 @@
 #'   \item{final_model [\code{\link[mlr]{WrappedModel}} | \code{NULL}]}{If \code{build.final.model=TRUE} in \code{\link{autoxgboost}} a \pkg{mlr} model build by the full dataset and \code{final.learner}.}
 #'   \item{measures [\code{\link[mlr]{Measure}}]}{Measure used for optimization.}
 #' }
-#' And the following functions
+#' And the following functions:\cr
 #' \describe{
 #'   \item{.$predict(newdata)}
 #'   \item{.$get_tune_results()}
@@ -65,16 +65,30 @@ AutoxgbResult = R6::R6Class("AutoxgbResult",
       stop("Final model was not build, use best param configs to build the model yourself.")
     predict(self$final_model, newdata = newdata, ...)
   },
-  get_tune_results = function() {},
-  plot_pareto_front = function() {},
+  get_tune_results = function() {
+    as.data.frame(self$optim_result$opt.path)
+  },
+  plot_pareto_front = function(x = NULL, y = NULL, color = NULL) {
+    df = self$get_tune_results()
+    assert_choice(x, colnames(df), null.ok = TRUE)
+    assert_choice(y, colnames(df), null.ok = TRUE)
+    assert_choice(color, colnames(df), null.ok = TRUE)
+    if (is.null(x)) x = self$measure_ids[1]
+    if (is.null(y) & length(self$measures) >= 2L) y = self$measure_ids[2]
+    
+    p = ggplot2::ggplot(df, aes_string(x = x, y = y, color = color)) +
+    geom_point() +
+    theme_bw()
+
+    return(p)
+  },
   get_best_from_opt = function(what) {
     self$optim_result$opt.path$env$extra[[self$optim_result$best.ind]][[what]]
   }
+  ),
+  active = list(
+    measure_ids = function() {
+      sapply(self$measures, function(x) x$id)
+    }
   )
 )
-
-
-# Get the iteration parameter of a fitted xboost model with early stopping
-getBestIteration = function(mod) {
-  getLearnerModel(mod, more.unwrap = TRUE)$best_iteration
-}

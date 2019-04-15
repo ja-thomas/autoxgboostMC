@@ -89,7 +89,7 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
     time.budget = NULL,
 
     max.nrounds = 3*10^3L,
-    early.stopping.rounds = 10L,
+    early.stopping.rounds = 20L,
     early.stopping.fraction = 4/5,
     impact.encoding.boundary = 10L,
     tune.threshold = TRUE,
@@ -122,6 +122,7 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
       self$time.budget = assert_integerish(time.budget)
       self$build.final.model = assert_flag(build.final.model)
       self$control = control
+
       self$baselearner = self$make_baselearner(task)
       transf_tasks = self$build_transform_pipeline(task)
       self$baselearner = setHyperPars(self$baselearner, early.stopping.data = transf_tasks$task.test)
@@ -207,7 +208,6 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
       return(list(task.train = task.train, task.test = task.test))
     },
 
-
     make_objective_function = function(transf_tasks) {
       is_thresholded_measure = sapply(self$measures, function(x) {
         props = getMeasureProperties(x)
@@ -224,7 +224,7 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
           lrn = setHyperPars(self$baselearner, par.vals = x)
           mod = train(lrn, transf_tasks$task.train)
           pred = predict(mod, transf_tasks$task.test)
-          nrounds = getBestIteration(mod)
+          nrounds = self$get_best_iteration(mod)
 
           # For now we tune threshold of first applicable measure.
           if (self$tune.threshold && getTaskType(transf_tasks$task.train) == "classif") {
@@ -343,6 +343,10 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
     # @param what [`character(1)`]: "nrounds" or ".threshold"
     get_best_from_opt = function(what) {
       self$optim.result$opt.path$env$extra[[self$optim.result$best.ind]][[what]]
+    },
+    # Get the iteration parameter of a fitted xboost model with early stopping
+    get_best_iteration = function(mod) {
+      getLearnerModel(mod, more.unwrap = TRUE)$best_iteration
     },
     plot_pareto_front = function() {self$model$plot_pareto_front()}
   ),
