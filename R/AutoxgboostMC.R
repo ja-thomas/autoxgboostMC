@@ -123,11 +123,15 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
       self$build.final.model = assert_flag(build.final.model)
       self$control = control
 
+      if (!is.null(self$model)) {
+        self$continue_fit()
+      } else {
       self$baselearner = self$make_baselearner(task)
       transf_tasks = self$build_transform_pipeline(task)
       self$baselearner = setHyperPars(self$baselearner, early.stopping.data = transf_tasks$task.test)
       self$obj_fun = self$make_objective_function(transf_tasks)
       self$optim.result = self$optimize_pipeline_mbo()
+      }
       lrn = self$build_final_learner()
       mod = NULL
       if(build.final.model) mod = train(lrn, task)
@@ -138,6 +142,8 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
         measures = self$measures,
         preproc_pipeline =  self$preproc_pipeline
       )
+    },
+    continue_fit = function(task, iterations = 160L, time.budget = 3600L, build.final.model = TRUE) {
     },
     predict = function(newdata) {
       predict(self$model$final_model, newdata)
@@ -255,10 +261,10 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
         ctrl = makeMBOControl(n.objectives = length(self$measures), y.name = measures_ids)
         self$control = setMBOControlTermination(ctrl, iters = self$iterations,
           time.budget = self$time.budget)
-      }
-      if (self$is_multicrit) {
-        self$control = setMBOControlMultiObj(self$control, method = "dib",dib.indicator = "eps")
-        self$control = setMBOControlInfill(self$control, crit = makeMBOInfillCritDIB(cb.lambda = 2L))
+        if (self$is_multicrit) {
+          self$control = setMBOControlMultiObj(self$control, method = "dib",dib.indicator = "eps")
+          self$control = setMBOControlInfill(self$control, crit = makeMBOInfillCritDIB(cb.lambda = 2L))
+        }
       }
       des = generateDesign(n = self$design.size, self$parset)
       optim.result = mbo(fun = self$obj_fun, control = self$control, design = des, learner = self$mbo.learner)
@@ -348,7 +354,8 @@ AutoxgboostMC = R6::R6Class("AutoxgboostMC",
     get_best_iteration = function(mod) {
       getLearnerModel(mod, more.unwrap = TRUE)$best_iteration
     },
-    plot_pareto_front = function() {self$model$plot_pareto_front()}
+    plot_pareto_front = function() {self$model$plot_pareto_front()},
+    plot_results = function() {self$model$plot_results()}
   ),
   active = list(
     early_stopping_measure = function(value) {

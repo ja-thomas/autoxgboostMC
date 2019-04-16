@@ -1,0 +1,38 @@
+---
+title: "Introduction to AutoxgboostMC"
+author: "Florian Pfisterer"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to AutoxgboostMC}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+## Single-Criteria Optimization AutoxgboostMC
+
+```{r}
+axgb = AutoxgboostMC$new(measures = list(auc))
+axgb$fit(pid.task, time.budget = 5L)
+p = axgb$predict(iris.task)
+```
+
+## Multi-Criteria Optimization AutoxgboostMC
+
+```{r}
+axgb = AutoxgboostMC$new(measures = list(auc, timepredict))
+axgb$fit(pid.task, time.budget = 5L)
+p = axgb$predict(iris.task)
+
+axgb$optim.result$pareto.front
+axgb$optim.result$pareto.set
+axgb$optim.result$pareto.inds
+```

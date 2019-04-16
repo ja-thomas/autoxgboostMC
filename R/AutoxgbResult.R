@@ -77,10 +77,21 @@ AutoxgbResult = R6::R6Class("AutoxgbResult",
     if (is.null(y) & length(self$measures) >= 2L) y = self$measure_ids[2]
     
     p = ggplot2::ggplot(df, aes_string(x = x, y = y, color = color)) +
-    geom_point() +
-    theme_bw()
+    ggplot2::geom_point() +
+    ggplot2::theme_bw()
 
     return(p)
+  },
+  plot_results = function() {
+    df = self$get_tune_results()
+    df$iter = seq_len(nrow(df))
+    pdf =  reshape2::melt(df[, self$measure_ids],
+      variable.name = "measure",
+      value.names = "value", id.vars = "iter")
+    ggplot2::ggplot(pdf, aes(x = value, y = measure, color = measure)) +
+      ggplot2::geom_boxplot() +
+      ggplot2::theme_bw()
+
   },
   get_best_from_opt = function(what) {
     self$optim_result$opt.path$env$extra[[self$optim_result$best.ind]][[what]]

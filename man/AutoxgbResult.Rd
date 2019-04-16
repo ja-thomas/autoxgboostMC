@@ -16,7 +16,7 @@ Result of \code{\link{autoxgboost}}. A R6 class containing the following element
   \item{final_model [\code{\link[mlr]{WrappedModel}} | \code{NULL}]}{If \code{build.final.model=TRUE} in \code{\link{autoxgboost}} a \pkg{mlr} model build by the full dataset and \code{final.learner}.}
   \item{measures [\code{\link[mlr]{Measure}}]}{Measure used for optimization.}
 }
-And the following functions
+And the following functions:\cr
 \describe{
   \item{.$predict(newdata)}
   \item{.$get_tune_results()}

@@ -31,5 +31,8 @@ Suggests:
     rgenoud,
     FeatureHashing,
     anytime,
-    lubridate
+    lubridate,
+    knitr,
+    rmarkdown
 RoxygenNote: 6.1.1
+VignetteBuilder: knitr
