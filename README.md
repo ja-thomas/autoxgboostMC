@@ -1,4 +1,4 @@
-# autoxgboostMC - Multiple-Criteria tuning and fitting of [xgboost](https://github.com/dmlc/xgboost).
+# autoxgboostMC - Multiple-Criteria tuning and fitting of [xgboost](https://github.com/dmlc/xgboost) models.
 
 <img align="right" src="https://raw.githubusercontent.com/ja-thomas/autoxgboost/master/man/figures/hexagon.svg?sanitize=true" width="125px">
 
@@ -19,6 +19,20 @@ autoxgboost aims to find an optimal [xgboost](https://github.com/dmlc/xgboost) m
 and the bayesian optimization framework [mlrMBO](https://github.com/mlr-org/mlrMBO).
 
 **Work in progress**!
+
+AutoxgboostMC embraces `R6` for a cleaner design. 
+See the example code below for the new *API*.
+
+```r
+# Instantiate the object with a list of measures to optimize.
+axgb = AutoxgboostMC$new(measures = list(auc, timepredict))
+# Set hyperparameters
+axgb$set_nthread(2L)
+# Fit on a Task
+axgb$fit(pid.task, time.budget = 5L)
+p = axgb$predict(iris.task)
+```
+
 
 # autoxgboost - How to Cite
 
