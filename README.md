@@ -25,12 +25,12 @@ See the example code below for the new *API*.
 
 ```r
 # Instantiate the object with a list of measures to optimize.
-axgb = AutoxgboostMC$new(measures = list(auc, timepredict))
+axgb = AutoxgboostMC$new(pid.task, measures = list(auc, timepredict))
 # Set hyperparameters
 axgb$set_nthread(2L)
 # Fit on a Task
-axgb$fit(pid.task, time.budget = 5L)
-p = axgb$predict(iris.task)
+axgb$fit(time.budget = 5L)
+p = axgb$predict(pid.task)
 ```
 
 
